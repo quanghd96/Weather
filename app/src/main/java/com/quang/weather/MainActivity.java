@@ -23,6 +23,7 @@ public class MainActivity extends AppCompatActivity {
     private ArrayList<Weather> listWeather;
     private ListView lvWeather;
     private WeatherAdapter adapter;
+    private MySQLiteController controller;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,12 +35,22 @@ public class MainActivity extends AppCompatActivity {
         adapter = new WeatherAdapter(this, R.layout.item_weather, listWeather);
         lvWeather.setAdapter(adapter);
 
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                new GetData().execute(getResources().getString(R.string.link));
+        controller = new MySQLiteController(this);
+
+        if (NetworkHelper.isOnline(this)) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    new GetData().execute(getResources().getString(R.string.link));
+                }
+            });
+        } else {
+            ArrayList<Weather> list = controller.getWeather();
+            for (int i = 0; i < list.size(); i++) {
+                listWeather.add(list.get(i));
+                adapter.notifyDataSetChanged();
             }
-        });
+        }
     }
 
     @SuppressLint("StaticFieldLeak")
@@ -56,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
             try {
                 JSONObject root = new JSONObject(s);
                 JSONArray list = root.getJSONArray("list");
+                controller.deleteWeather();
                 for (int i = 0; i < list.length(); i++) {
                     JSONObject object = list.getJSONObject(i);
                     JSONObject temp = object.getJSONObject("temp");
@@ -67,8 +79,10 @@ public class MainActivity extends AppCompatActivity {
                     String weatherDescription = weather.getJSONObject(0).getString("description");
                     String weatherIcon = weather.getJSONObject(0).getString("icon");
                     double speed = object.getDouble("speed");
-                    listWeather.add(new Weather(tempMax, tempMin, humidity, weatherMain, weatherDescription, weatherIcon, speed));
+                    Weather wea = new Weather(tempMax, tempMin, humidity, weatherMain, weatherDescription, weatherIcon, speed);
+                    listWeather.add(wea);
                     adapter.notifyDataSetChanged();
+                    controller.insertWeather(wea);
                 }
             } catch (JSONException e) {
                 e.printStackTrace();
